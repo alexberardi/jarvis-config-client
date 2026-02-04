@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
 
 import httpx
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -75,8 +76,6 @@ class ConfigClient:
 
     def _init_db(self) -> None:
         """Create the service_configs table if it doesn't exist."""
-        from sqlalchemy import text
-
         create_table_sql = """
         CREATE TABLE IF NOT EXISTS service_configs (
             name VARCHAR(64) PRIMARY KEY,
@@ -100,8 +99,6 @@ class ConfigClient:
         """Persist services to database."""
         if not self.db_engine:
             return
-
-        from sqlalchemy import text
 
         upsert_sql = """
         INSERT INTO service_configs (name, host, port, url, health_path, scheme, description, updated_at)
@@ -137,8 +134,6 @@ class ConfigClient:
         """Load services from database."""
         if not self.db_engine:
             return {}
-
-        from sqlalchemy import text
 
         try:
             with self.db_engine.connect() as conn:
