@@ -15,6 +15,14 @@ from typing import Any, Callable, Dict, Optional
 
 import httpx
 
+# SQLAlchemy is optional - only needed for database persistence
+try:
+    from sqlalchemy import text
+    from sqlalchemy.exc import SQLAlchemyError
+except ImportError:
+    text = None  # type: ignore[assignment]
+    SQLAlchemyError = Exception  # type: ignore[misc,assignment]
+
 logger = logging.getLogger(__name__)
 
 
@@ -75,8 +83,6 @@ class ConfigClient:
 
     def _init_db(self) -> None:
         """Create the service_configs table if it doesn't exist."""
-        from sqlalchemy import text
-
         create_table_sql = """
         CREATE TABLE IF NOT EXISTS service_configs (
             name VARCHAR(64) PRIMARY KEY,
@@ -100,8 +106,6 @@ class ConfigClient:
         """Persist services to database."""
         if not self.db_engine:
             return
-
-        from sqlalchemy import text
 
         upsert_sql = """
         INSERT INTO service_configs (name, host, port, url, health_path, scheme, description, updated_at)
@@ -130,15 +134,13 @@ class ConfigClient:
                     })
                 conn.commit()
             logger.debug(f"Saved {len(services)} services to database")
-        except Exception as e:
-            logger.warning(f"Failed to save services to database: {e}")
+        except SQLAlchemyError as e:
+            logger.warning(f"Failed to save services to database: {type(e).__name__}: {e}")
 
     def _load_from_db(self) -> Dict[str, ServiceConfig]:
         """Load services from database."""
         if not self.db_engine:
             return {}
-
-        from sqlalchemy import text
 
         try:
             with self.db_engine.connect() as conn:
@@ -156,8 +158,8 @@ class ConfigClient:
                     )
                 logger.debug(f"Loaded {len(services)} services from database")
                 return services
-        except Exception as e:
-            logger.warning(f"Failed to load services from database: {e}")
+        except SQLAlchemyError as e:
+            logger.warning(f"Failed to load services from database: {type(e).__name__}: {e}")
             return {}
 
     def fetch_services(self) -> Dict[str, ServiceConfig]:
@@ -233,8 +235,8 @@ class ConfigClient:
 
             return True
 
-        except Exception as e:
-            logger.warning(f"Failed to refresh services: {e}")
+        except httpx.HTTPError as e:
+            logger.warning(f"Failed to refresh services: {type(e).__name__}: {e}")
 
             # Try to load from database as fallback
             if self.db_engine and not self._services:
