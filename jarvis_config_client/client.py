@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
 
 import httpx
-from sqlalchemy import text
 
 # SQLAlchemy is optional - only needed for database persistence
 try:
@@ -24,7 +23,24 @@ except ImportError:
     text = None  # type: ignore[assignment]
     SQLAlchemyError = Exception  # type: ignore[misc,assignment]
 
+from jarvis_config_client.discovery import discover_config_service
+
 logger = logging.getLogger(__name__)
+
+
+# --- Exceptions ---
+
+
+class ConfigServiceNotFoundError(RuntimeError):
+    """Raised when jarvis-config-service cannot be discovered."""
+
+
+class ServiceNotFoundError(RuntimeError):
+    """Raised when a specific service is not registered in config-service."""
+
+    def __init__(self, service_name: str):
+        self.service_name = service_name
+        super().__init__(f"Service '{service_name}' not found in config-service registry")
 
 
 @dataclass
@@ -310,7 +326,7 @@ class ConfigClient:
         Get configuration for a specific service.
 
         Args:
-            name: Service name (e.g., "jarvis-auth")
+            name: Service name (e.g., "auth")
 
         Returns:
             ServiceConfig or None if not found
@@ -323,7 +339,7 @@ class ConfigClient:
         Get URL for a specific service.
 
         Args:
-            name: Service name (e.g., "jarvis-auth")
+            name: Service name (e.g., "auth")
 
         Returns:
             Service URL or None if not found
@@ -350,8 +366,12 @@ def init(
     """
     Initialize the global config client.
 
+    If no config_url is provided and JARVIS_CONFIG_URL is not set,
+    auto-discovery will attempt to find jarvis-config-service on the network.
+
     Args:
-        config_url: URL of jarvis-config-service. Defaults to JARVIS_CONFIG_URL env var.
+        config_url: URL of jarvis-config-service. Falls back to JARVIS_CONFIG_URL env var,
+                    then auto-discovery.
         refresh_interval_seconds: How often to refresh (default: 300s / 5 min)
         db_engine: Optional SQLAlchemy engine for persistent caching
         on_refresh: Optional callback when services are refreshed
@@ -360,7 +380,7 @@ def init(
         True if initial fetch succeeded, False if using cached data
 
     Raises:
-        ValueError: If no config_url provided and JARVIS_CONFIG_URL not set
+        ConfigServiceNotFoundError: If config-service cannot be found by any method
     """
     global _client
 
@@ -370,9 +390,12 @@ def init(
 
     url = config_url or os.getenv("JARVIS_CONFIG_URL")
     if not url:
-        raise ValueError(
-            "config_url not provided and JARVIS_CONFIG_URL environment variable not set"
-        )
+        url = discover_config_service()
+        if not url:
+            raise ConfigServiceNotFoundError(
+                "Could not find jarvis-config-service. Set JARVIS_CONFIG_URL or ensure "
+                "the service is running on the local network."
+            )
 
     _client = ConfigClient(
         config_url=url,
@@ -401,7 +424,7 @@ def get_service_url(name: str) -> Optional[str]:
     Get URL for a specific service.
 
     Args:
-        name: Service name (e.g., "jarvis-auth")
+        name: Service name (e.g., "auth")
 
     Returns:
         Service URL or None if not found
@@ -413,6 +436,26 @@ def get_service_url(name: str) -> Optional[str]:
         raise RuntimeError("Config client not initialized. Call init() first.")
 
     return _client.get_url(name)
+
+
+def require_service_url(name: str) -> str:
+    """
+    Get URL for a specific service, raising if not found.
+
+    Args:
+        name: Service name (e.g., "auth")
+
+    Returns:
+        Service URL
+
+    Raises:
+        RuntimeError: If init() hasn't been called
+        ServiceNotFoundError: If the service is not registered
+    """
+    url = get_service_url(name)
+    if url is None:
+        raise ServiceNotFoundError(name)
+    return url
 
 
 def get_all_services() -> Dict[str, ServiceConfig]:
@@ -445,3 +488,57 @@ def refresh_services() -> bool:
         raise RuntimeError("Config client not initialized. Call init() first.")
 
     return _client.refresh()
+
+
+# --- Named helper functions ---
+# Convenience wrappers so consumers don't need to know service name strings.
+
+
+def get_auth_url() -> str:
+    """Get the auth service URL."""
+    return require_service_url("auth")
+
+
+def get_command_center_url() -> str:
+    """Get the command-center service URL."""
+    return require_service_url("command-center")
+
+
+def get_llm_proxy_url() -> str:
+    """Get the llm-proxy service URL."""
+    return require_service_url("llm-proxy")
+
+
+def get_whisper_url() -> str:
+    """Get the whisper service URL."""
+    return require_service_url("whisper")
+
+
+def get_tts_url() -> str:
+    """Get the tts service URL."""
+    return require_service_url("tts")
+
+
+def get_logs_url() -> str:
+    """Get the logs service URL."""
+    return require_service_url("logs")
+
+
+def get_ocr_url() -> str:
+    """Get the ocr service URL."""
+    return require_service_url("ocr")
+
+
+def get_recipes_url() -> str:
+    """Get the recipes service URL."""
+    return require_service_url("recipes")
+
+
+def get_mcp_url() -> str:
+    """Get the mcp service URL."""
+    return require_service_url("mcp")
+
+
+def get_mqtt_broker_url() -> str:
+    """Get the mqtt-broker URL."""
+    return require_service_url("mqtt-broker")

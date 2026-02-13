@@ -8,8 +8,14 @@ from jarvis_config_client import (
     shutdown,
     get_service_url,
     get_all_services,
+    require_service_url,
+    get_auth_url,
+    get_logs_url,
+    get_llm_proxy_url,
     ConfigClient,
+    ConfigServiceNotFoundError,
     ServiceConfig,
+    ServiceNotFoundError,
 )
 
 
@@ -19,7 +25,7 @@ def mock_services_response():
     return {
         "services": [
             {
-                "name": "jarvis-auth",
+                "name": "auth",
                 "host": "localhost",
                 "port": 8007,
                 "url": "http://localhost:8007",
@@ -27,12 +33,20 @@ def mock_services_response():
                 "description": "Authentication service",
             },
             {
-                "name": "jarvis-logs",
+                "name": "logs",
                 "host": "localhost",
                 "port": 8006,
                 "url": "http://localhost:8006",
                 "health_path": "/health",
                 "description": "Logging service",
+            },
+            {
+                "name": "llm-proxy",
+                "host": "localhost",
+                "port": 8000,
+                "url": "http://localhost:8000",
+                "health_path": "/health",
+                "description": "LLM proxy",
             },
         ]
     }
@@ -63,11 +77,11 @@ class TestConfigClient:
         client = ConfigClient(config_url="http://localhost:8013")
         services = client.fetch_services()
 
-        assert len(services) == 2
-        assert "jarvis-auth" in services
-        assert "jarvis-logs" in services
-        assert services["jarvis-auth"].url == "http://localhost:8007"
-        assert services["jarvis-logs"].port == 8006
+        assert len(services) == 3
+        assert "auth" in services
+        assert "logs" in services
+        assert services["auth"].url == "http://localhost:8007"
+        assert services["logs"].port == 8006
 
     def test_refresh_updates_cache(self, mock_httpx_client):
         """Test that refresh updates the internal cache."""
@@ -78,14 +92,14 @@ class TestConfigClient:
         success = client.refresh()
 
         assert success is True
-        assert len(client.get_all()) == 2
+        assert len(client.get_all()) == 3
 
     def test_get_url(self, mock_httpx_client):
         """Test getting URL for a specific service."""
         client = ConfigClient(config_url="http://localhost:8013")
         client.refresh()
 
-        url = client.get_url("jarvis-auth")
+        url = client.get_url("auth")
         assert url == "http://localhost:8007"
 
         url = client.get_url("nonexistent")
@@ -96,9 +110,9 @@ class TestConfigClient:
         client = ConfigClient(config_url="http://localhost:8013")
         client.refresh()
 
-        svc = client.get_service("jarvis-logs")
+        svc = client.get_service("logs")
         assert isinstance(svc, ServiceConfig)
-        assert svc.name == "jarvis-logs"
+        assert svc.name == "logs"
         assert svc.host == "localhost"
         assert svc.port == 8006
 
@@ -115,22 +129,31 @@ class TestGlobalFunctions:
         success = init(config_url="http://localhost:8013")
         assert success is True
 
-    def test_init_without_url_raises(self):
-        """Test init without URL raises ValueError."""
+    @patch("jarvis_config_client.client.discover_config_service", return_value=None)
+    def test_init_without_url_raises_config_not_found(self, mock_discover):
+        """Test init without URL raises ConfigServiceNotFoundError."""
         with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(ValueError, match="JARVIS_CONFIG_URL"):
+            with pytest.raises(ConfigServiceNotFoundError, match="Could not find"):
                 init()
+
+    @patch("jarvis_config_client.client.discover_config_service", return_value="http://192.168.1.50:8013")
+    def test_init_auto_discovery(self, mock_discover, mock_httpx_client):
+        """Test init with auto-discovery."""
+        with patch.dict("os.environ", {}, clear=True):
+            success = init()
+            assert success is True
+            mock_discover.assert_called_once()
 
     def test_get_service_url_before_init_raises(self):
         """Test get_service_url before init raises RuntimeError."""
         with pytest.raises(RuntimeError, match="not initialized"):
-            get_service_url("jarvis-auth")
+            get_service_url("auth")
 
     def test_get_service_url_after_init(self, mock_httpx_client):
         """Test get_service_url after init works."""
         init(config_url="http://localhost:8013")
 
-        url = get_service_url("jarvis-auth")
+        url = get_service_url("auth")
         assert url == "http://localhost:8007"
 
     def test_get_all_services_after_init(self, mock_httpx_client):
@@ -138,6 +161,57 @@ class TestGlobalFunctions:
         init(config_url="http://localhost:8013")
 
         services = get_all_services()
-        assert len(services) == 2
-        assert "jarvis-auth" in services
-        assert "jarvis-logs" in services
+        assert len(services) == 3
+        assert "auth" in services
+        assert "logs" in services
+
+
+class TestRequireServiceUrl:
+    """Tests for require_service_url."""
+
+    def teardown_method(self):
+        shutdown()
+
+    def test_returns_url_when_found(self, mock_httpx_client):
+        """Test require_service_url returns URL for existing service."""
+        init(config_url="http://localhost:8013")
+        url = require_service_url("auth")
+        assert url == "http://localhost:8007"
+
+    def test_raises_when_not_found(self, mock_httpx_client):
+        """Test require_service_url raises ServiceNotFoundError for missing service."""
+        init(config_url="http://localhost:8013")
+        with pytest.raises(ServiceNotFoundError, match="nonexistent"):
+            require_service_url("nonexistent")
+
+    def test_raises_before_init(self):
+        """Test require_service_url raises RuntimeError before init."""
+        with pytest.raises(RuntimeError, match="not initialized"):
+            require_service_url("auth")
+
+
+class TestNamedHelpers:
+    """Tests for named helper functions (get_auth_url, get_logs_url, etc)."""
+
+    def teardown_method(self):
+        shutdown()
+
+    def test_get_auth_url(self, mock_httpx_client):
+        init(config_url="http://localhost:8013")
+        assert get_auth_url() == "http://localhost:8007"
+
+    def test_get_logs_url(self, mock_httpx_client):
+        init(config_url="http://localhost:8013")
+        assert get_logs_url() == "http://localhost:8006"
+
+    def test_get_llm_proxy_url(self, mock_httpx_client):
+        init(config_url="http://localhost:8013")
+        assert get_llm_proxy_url() == "http://localhost:8000"
+
+    def test_helper_raises_when_service_missing(self, mock_httpx_client):
+        """Named helpers raise ServiceNotFoundError when service not in registry."""
+        init(config_url="http://localhost:8013")
+        # whisper is not in our mock response
+        from jarvis_config_client import get_whisper_url
+        with pytest.raises(ServiceNotFoundError, match="whisper"):
+            get_whisper_url()
