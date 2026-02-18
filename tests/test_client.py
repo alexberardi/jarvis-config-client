@@ -27,16 +27,16 @@ def mock_services_response():
             {
                 "name": "auth",
                 "host": "localhost",
-                "port": 8007,
-                "url": "http://localhost:8007",
+                "port": 7701,
+                "url": "http://localhost:7701",
                 "health_path": "/health",
                 "description": "Authentication service",
             },
             {
                 "name": "logs",
                 "host": "localhost",
-                "port": 8006,
-                "url": "http://localhost:8006",
+                "port": 7702,
+                "url": "http://localhost:7702",
                 "health_path": "/health",
                 "description": "Logging service",
             },
@@ -74,18 +74,18 @@ class TestConfigClient:
 
     def test_fetch_services(self, mock_httpx_client, mock_services_response):
         """Test fetching services from config service."""
-        client = ConfigClient(config_url="http://localhost:8013")
+        client = ConfigClient(config_url="http://localhost:7700")
         services = client.fetch_services()
 
         assert len(services) == 3
         assert "auth" in services
         assert "logs" in services
-        assert services["auth"].url == "http://localhost:8007"
-        assert services["logs"].port == 8006
+        assert services["auth"].url == "http://localhost:7701"
+        assert services["logs"].port == 7702
 
     def test_refresh_updates_cache(self, mock_httpx_client):
         """Test that refresh updates the internal cache."""
-        client = ConfigClient(config_url="http://localhost:8013")
+        client = ConfigClient(config_url="http://localhost:7700")
 
         assert len(client.get_all()) == 0
 
@@ -96,25 +96,25 @@ class TestConfigClient:
 
     def test_get_url(self, mock_httpx_client):
         """Test getting URL for a specific service."""
-        client = ConfigClient(config_url="http://localhost:8013")
+        client = ConfigClient(config_url="http://localhost:7700")
         client.refresh()
 
         url = client.get_url("auth")
-        assert url == "http://localhost:8007"
+        assert url == "http://localhost:7701"
 
         url = client.get_url("nonexistent")
         assert url is None
 
     def test_get_service(self, mock_httpx_client):
         """Test getting service config."""
-        client = ConfigClient(config_url="http://localhost:8013")
+        client = ConfigClient(config_url="http://localhost:7700")
         client.refresh()
 
         svc = client.get_service("logs")
         assert isinstance(svc, ServiceConfig)
         assert svc.name == "logs"
         assert svc.host == "localhost"
-        assert svc.port == 8006
+        assert svc.port == 7702
 
 
 class TestGlobalFunctions:
@@ -126,7 +126,7 @@ class TestGlobalFunctions:
 
     def test_init_with_url(self, mock_httpx_client):
         """Test init with explicit URL."""
-        success = init(config_url="http://localhost:8013")
+        success = init(config_url="http://localhost:7700")
         assert success is True
 
     @patch("jarvis_config_client.client.discover_config_service", return_value=None)
@@ -151,14 +151,14 @@ class TestGlobalFunctions:
 
     def test_get_service_url_after_init(self, mock_httpx_client):
         """Test get_service_url after init works."""
-        init(config_url="http://localhost:8013")
+        init(config_url="http://localhost:7700")
 
         url = get_service_url("auth")
-        assert url == "http://localhost:8007"
+        assert url == "http://localhost:7701"
 
     def test_get_all_services_after_init(self, mock_httpx_client):
         """Test get_all_services after init works."""
-        init(config_url="http://localhost:8013")
+        init(config_url="http://localhost:7700")
 
         services = get_all_services()
         assert len(services) == 3

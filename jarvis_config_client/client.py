@@ -77,7 +77,7 @@ class ConfigClient:
         Initialize the config client.
 
         Args:
-            config_url: URL of jarvis-config-service (e.g., http://localhost:8013)
+            config_url: URL of jarvis-config-service (e.g., http://localhost:7700)
             refresh_interval_seconds: How often to refresh service URLs (default: 300s / 5 min)
             db_engine: Optional SQLAlchemy engine for persistent caching
             on_refresh: Optional callback when services are refreshed

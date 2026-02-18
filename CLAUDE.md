@@ -18,7 +18,7 @@ pytest
 from jarvis_config_client import init, get_service_url
 
 # Initialize once at startup
-init(config_url="http://localhost:8013")
+init(config_url="http://localhost:7700")
 
 # Get service URLs
 auth_url = get_service_url("jarvis-auth")
@@ -32,7 +32,7 @@ from sqlalchemy import create_engine
 from jarvis_config_client import init
 
 engine = create_engine("postgresql://...")
-init(config_url="http://localhost:8013", db_engine=engine)
+init(config_url="http://localhost:7700", db_engine=engine)
 ```
 
 ## Architecture

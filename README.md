@@ -18,7 +18,7 @@ pip install -e ".[postgres]"
 from jarvis_config_client import init, get_service_url, shutdown
 
 # Initialize once at startup
-init(config_url="http://localhost:8013")
+init(config_url="http://localhost:7700")
 
 # Get service URLs anywhere in your app
 auth_url = get_service_url("jarvis-auth")
@@ -42,7 +42,7 @@ engine = create_engine("postgresql://user:pass@localhost:5432/mydb")
 
 # Initialize with database persistence
 init(
-    config_url="http://localhost:8013",
+    config_url="http://localhost:7700",
     db_engine=engine,
     refresh_interval_seconds=300,  # Refresh every 5 minutes
 )
@@ -82,7 +82,7 @@ Initialize the config client. Must be called before other functions.
 Get URL for a specific service by name.
 
 ```python
-url = get_service_url("jarvis-auth")  # Returns "http://localhost:8007"
+url = get_service_url("jarvis-auth")  # Returns "http://localhost:7701"
 ```
 
 ### `get_all_services()`
