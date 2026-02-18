@@ -136,7 +136,7 @@ class TestGlobalFunctions:
             with pytest.raises(ConfigServiceNotFoundError, match="Could not find"):
                 init()
 
-    @patch("jarvis_config_client.client.discover_config_service", return_value="http://192.168.1.50:8013")
+    @patch("jarvis_config_client.client.discover_config_service", return_value="http://192.168.1.50:7700")
     def test_init_auto_discovery(self, mock_discover, mock_httpx_client):
         """Test init with auto-discovery."""
         with patch.dict("os.environ", {}, clear=True):
@@ -174,13 +174,13 @@ class TestRequireServiceUrl:
 
     def test_returns_url_when_found(self, mock_httpx_client):
         """Test require_service_url returns URL for existing service."""
-        init(config_url="http://localhost:8013")
+        init(config_url="http://localhost:7700")
         url = require_service_url("auth")
-        assert url == "http://localhost:8007"
+        assert url == "http://localhost:7701"
 
     def test_raises_when_not_found(self, mock_httpx_client):
         """Test require_service_url raises ServiceNotFoundError for missing service."""
-        init(config_url="http://localhost:8013")
+        init(config_url="http://localhost:7700")
         with pytest.raises(ServiceNotFoundError, match="nonexistent"):
             require_service_url("nonexistent")
 
@@ -197,20 +197,20 @@ class TestNamedHelpers:
         shutdown()
 
     def test_get_auth_url(self, mock_httpx_client):
-        init(config_url="http://localhost:8013")
-        assert get_auth_url() == "http://localhost:8007"
+        init(config_url="http://localhost:7700")
+        assert get_auth_url() == "http://localhost:7701"
 
     def test_get_logs_url(self, mock_httpx_client):
-        init(config_url="http://localhost:8013")
-        assert get_logs_url() == "http://localhost:8006"
+        init(config_url="http://localhost:7700")
+        assert get_logs_url() == "http://localhost:7702"
 
     def test_get_llm_proxy_url(self, mock_httpx_client):
-        init(config_url="http://localhost:8013")
+        init(config_url="http://localhost:7700")
         assert get_llm_proxy_url() == "http://localhost:8000"
 
     def test_helper_raises_when_service_missing(self, mock_httpx_client):
         """Named helpers raise ServiceNotFoundError when service not in registry."""
-        init(config_url="http://localhost:8013")
+        init(config_url="http://localhost:7700")
         # whisper is not in our mock response
         from jarvis_config_client import get_whisper_url
         with pytest.raises(ServiceNotFoundError, match="whisper"):
