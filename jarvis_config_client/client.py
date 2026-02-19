@@ -194,10 +194,10 @@ class ConfigClient:
         """
         url = f"{self.config_url}/services"
 
-        # Check for URL style preference (for Docker containers)
+        # Detect Docker environment: explicit env var, or infer from config URL
         url_style = os.getenv("JARVIS_CONFIG_URL_STYLE", "").lower()
         params = {}
-        if url_style == "dockerized":
+        if url_style == "dockerized" or "host.docker.internal" in self.config_url:
             params["style"] = "dockerized"
 
         try:
