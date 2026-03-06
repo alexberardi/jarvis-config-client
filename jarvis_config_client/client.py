@@ -194,10 +194,17 @@ class ConfigClient:
         """
         url = f"{self.config_url}/services"
 
-        # Detect Docker environment: explicit env var, or infer from config URL
+        # Detect URL style from env var or infer from config URL
         url_style = os.getenv("JARVIS_CONFIG_URL_STYLE", "").lower()
-        params = {}
-        if url_style == "dockerized" or "host.docker.internal" in self.config_url:
+        params: dict[str, str] = {}
+        if url_style == "remote":
+            params["style"] = "remote"
+            # Auto-infer main server IP from config URL
+            from urllib.parse import urlparse
+            parsed = urlparse(self.config_url)
+            if parsed.hostname and parsed.hostname not in ("localhost", "127.0.0.1"):
+                params["remote_host"] = parsed.hostname
+        elif url_style == "dockerized" or "host.docker.internal" in self.config_url:
             params["style"] = "dockerized"
 
         try:
@@ -325,14 +332,25 @@ class ConfigClient:
         """
         Get configuration for a specific service.
 
+        Supports both short names (e.g., "auth", "logs") and full names
+        (e.g., "jarvis-auth", "jarvis-logs"). Short names are resolved by
+        prepending "jarvis-".
+
         Args:
-            name: Service name (e.g., "auth")
+            name: Service name (e.g., "auth" or "jarvis-auth")
 
         Returns:
             ServiceConfig or None if not found
         """
         with self._lock:
-            return self._services.get(name)
+            # Try exact match first
+            svc = self._services.get(name)
+            if svc:
+                return svc
+            # Try with "jarvis-" prefix for short names
+            if not name.startswith("jarvis-"):
+                return self._services.get(f"jarvis-{name}")
+            return None
 
     def get_url(self, name: str) -> Optional[str]:
         """

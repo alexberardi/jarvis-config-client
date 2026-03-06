@@ -169,6 +169,57 @@ class TestConfigClient:
         assert svc.port == 7702
 
 
+class TestRemoteUrlStyle:
+    """Tests for remote URL style detection in fetch_services."""
+
+    def test_remote_style_sends_params(self, mock_httpx_client):
+        """Test that JARVIS_CONFIG_URL_STYLE=remote sends style=remote param."""
+        with patch.dict("os.environ", {"JARVIS_CONFIG_URL_STYLE": "remote"}):
+            client = ConfigClient(config_url="http://10.0.0.5:7700")
+            client.fetch_services()
+
+            # Verify the GET call included style=remote and remote_host
+            mock_instance = mock_httpx_client.return_value.__enter__.return_value
+            call_args = mock_instance.get.call_args
+            assert call_args.kwargs["params"]["style"] == "remote"
+            assert call_args.kwargs["params"]["remote_host"] == "10.0.0.5"
+
+    def test_remote_style_infers_host_from_config_url(self, mock_httpx_client):
+        """Test host is auto-inferred from non-localhost config URL."""
+        with patch.dict("os.environ", {"JARVIS_CONFIG_URL_STYLE": "remote"}):
+            client = ConfigClient(config_url="http://192.168.1.100:7700")
+            client.fetch_services()
+
+            mock_instance = mock_httpx_client.return_value.__enter__.return_value
+            call_args = mock_instance.get.call_args
+            assert call_args.kwargs["params"]["remote_host"] == "192.168.1.100"
+
+    def test_remote_style_skips_localhost_host(self, mock_httpx_client):
+        """Test remote style does not send remote_host when config URL is localhost."""
+        with patch.dict("os.environ", {"JARVIS_CONFIG_URL_STYLE": "remote"}):
+            client = ConfigClient(config_url="http://localhost:7700")
+            client.fetch_services()
+
+            mock_instance = mock_httpx_client.return_value.__enter__.return_value
+            call_args = mock_instance.get.call_args
+            assert call_args.kwargs["params"]["style"] == "remote"
+            assert "remote_host" not in call_args.kwargs["params"]
+
+    def test_no_style_env_sends_no_params(self, mock_httpx_client):
+        """Test that without JARVIS_CONFIG_URL_STYLE, no style param is sent."""
+        with patch.dict("os.environ", {}, clear=False):
+            # Ensure the env var is not set
+            import os
+            os.environ.pop("JARVIS_CONFIG_URL_STYLE", None)
+
+            client = ConfigClient(config_url="http://10.0.0.5:7700")
+            client.fetch_services()
+
+            mock_instance = mock_httpx_client.return_value.__enter__.return_value
+            call_args = mock_instance.get.call_args
+            assert call_args.kwargs["params"] == {}
+
+
 class TestGlobalFunctions:
     """Tests for module-level functions."""
 
