@@ -67,11 +67,11 @@ class TestDiscoverConfigService:
 
     @patch("jarvis_config_client.discovery._probe_config_service")
     def test_probes_localhost_second(self, mock_probe):
-        mock_probe.return_value = "http://localhost:8013"
+        mock_probe.return_value = "http://localhost:7700"
         with patch.dict("os.environ", {}, clear=True):
             result = discover_config_service()
-            assert result == "http://localhost:8013"
-            mock_probe.assert_called_once_with("http://localhost:8013", 2.0)
+            assert result == "http://localhost:7700"
+            mock_probe.assert_called_once_with("http://localhost:7700", 2.0)
 
     @patch("jarvis_config_client.discovery._scan_subnet")
     @patch("jarvis_config_client.discovery._get_local_ip")
@@ -84,7 +84,7 @@ class TestDiscoverConfigService:
         with patch.dict("os.environ", {}, clear=True):
             result = discover_config_service()
             assert result == "http://192.168.1.50:8013"
-            mock_scan.assert_called_once_with("192.168.1.100", 8013, 2.0)
+            mock_scan.assert_called_once_with("192.168.1.100", 7700, 2.0)
 
     @patch("jarvis_config_client.discovery._get_local_ip")
     @patch("jarvis_config_client.discovery._probe_config_service")

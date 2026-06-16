@@ -17,7 +17,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_PORT = 8013
+_DEFAULT_PORT = 7700  # must match jarvis-config-service's default PORT
 
 
 def _probe_config_service(url: str, timeout: float) -> str | None:
@@ -79,7 +79,7 @@ def discover_config_service(port: int | None = None, timeout: float = 2.0) -> st
     4. Return discovered URL or None
 
     Args:
-        port: Port to scan (default: JARVIS_CONFIG_PORT env var or 8013)
+        port: Port to scan (default: JARVIS_CONFIG_PORT env var or 7700)
         timeout: Timeout per probe in seconds
 
     Returns:
