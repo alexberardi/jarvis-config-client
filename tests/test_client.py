@@ -184,6 +184,21 @@ class TestRemoteUrlStyle:
             assert call_args.kwargs["params"]["style"] == "remote"
             assert call_args.kwargs["params"]["remote_host"] == "10.0.0.5"
 
+    def test_external_style_sends_params(self, mock_httpx_client):
+        """JARVIS_CONFIG_URL_STYLE=external sends style=external + remote_host.
+
+        'external' is the correct off-box style: unlike 'remote' (which only
+        rewrites localhost-registered rows), it uses each service's published
+        external coordinates, so container-name HTTP rows resolve too."""
+        with patch.dict("os.environ", {"JARVIS_CONFIG_URL_STYLE": "external"}):
+            client = ConfigClient(config_url="http://10.0.0.5:7700")
+            client.fetch_services()
+
+            mock_instance = mock_httpx_client.return_value.__enter__.return_value
+            call_args = mock_instance.get.call_args
+            assert call_args.kwargs["params"]["style"] == "external"
+            assert call_args.kwargs["params"]["remote_host"] == "10.0.0.5"
+
     def test_remote_style_infers_host_from_config_url(self, mock_httpx_client):
         """Test host is auto-inferred from non-localhost config URL."""
         with patch.dict("os.environ", {"JARVIS_CONFIG_URL_STYLE": "remote"}):

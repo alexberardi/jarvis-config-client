@@ -197,8 +197,13 @@ class ConfigClient:
         # Detect URL style from env var or infer from config URL
         url_style = os.getenv("JARVIS_CONFIG_URL_STYLE", "").lower()
         params: dict[str, str] = {}
-        if url_style == "remote":
-            params["style"] = "remote"
+        # 'external' and 'remote' both target off-box consumers and both need the
+        # server host inferred from the config URL. 'external' additionally uses
+        # each service's published (external_host/external_port) coordinates, so
+        # it correctly resolves container-name HTTP rows too — not just localhost-
+        # registered infra like the broker. Off-box consumers should use it.
+        if url_style in ("remote", "external"):
+            params["style"] = url_style
             # Auto-infer main server IP from config URL
             from urllib.parse import urlparse
             parsed = urlparse(self.config_url)
