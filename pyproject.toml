@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jarvis-config-client"
-version = "0.2.1"
+version = "0.2.2"
 description = "Service discovery client for jarvis microservices"
 readme = "README.md"
 requires-python = ">=3.10"
