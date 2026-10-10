@@ -379,6 +379,13 @@ class ConfigClient:
 # Global singleton instance
 _client: Optional[ConfigClient] = None
 
+# Serializes init()/shutdown(). Consumers retry init() from several threads
+# while config-service is down; without this, two concurrent calls both stop
+# the same old client and each start a new one, and the loser's refresh
+# thread runs forever (one leaked thread per race).
+_init_lock = threading.Lock()
+_atexit_registered = False
+
 
 def init(
     config_url: Optional[str] = None,
@@ -405,41 +412,46 @@ def init(
     Raises:
         ConfigServiceNotFoundError: If config-service cannot be found by any method
     """
-    global _client
+    global _client, _atexit_registered
 
-    if _client is not None:
-        logger.warning("Config client already initialized, reinitializing...")
-        _client.stop()
+    with _init_lock:
+        if _client is not None:
+            logger.warning("Config client already initialized, reinitializing...")
+            _client.stop()
+            _client = None
 
-    url = config_url or os.getenv("JARVIS_CONFIG_URL")
-    if not url:
-        url = discover_config_service()
+        url = config_url or os.getenv("JARVIS_CONFIG_URL")
         if not url:
-            raise ConfigServiceNotFoundError(
-                "Could not find jarvis-config-service. Set JARVIS_CONFIG_URL or ensure "
-                "the service is running on the local network."
-            )
+            url = discover_config_service()
+            if not url:
+                raise ConfigServiceNotFoundError(
+                    "Could not find jarvis-config-service. Set JARVIS_CONFIG_URL or ensure "
+                    "the service is running on the local network."
+                )
 
-    _client = ConfigClient(
-        config_url=url,
-        refresh_interval_seconds=refresh_interval_seconds,
-        db_engine=db_engine,
-        on_refresh=on_refresh,
-    )
+        _client = ConfigClient(
+            config_url=url,
+            refresh_interval_seconds=refresh_interval_seconds,
+            db_engine=db_engine,
+            on_refresh=on_refresh,
+        )
 
-    # Register shutdown handler
-    atexit.register(shutdown)
+        # Register the shutdown handler once, not once per (re)init.
+        if not _atexit_registered:
+            atexit.register(shutdown)
+            _atexit_registered = True
 
-    return _client.start()
+        return _client.start()
 
 
 def shutdown() -> None:
     """Shutdown the global config client."""
     global _client
 
-    if _client is not None:
-        _client.stop()
-        _client = None
+    with _init_lock:
+        if _client is not None:
+            _client.stop()
+            _client = None
 
 
 def get_service_url(name: str) -> Optional[str]:
